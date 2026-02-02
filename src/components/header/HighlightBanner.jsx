@@ -44,12 +44,12 @@ const HighlightBanner = memo(function HighlightBanner() {
                 aria-hidden="true" 
                 className="absolute inset-0 text-transparent bg-clip-text bg-linear-to-r from-yellow-300 via-white to-yellow-300 animate-[shimmer_2s_infinite] bg-size-[200%_100%] pointer-events-none"
               >
-                Satta King Cloud 
+                Satta King Result
               </span>
               
               {/* Actual Readable Text for SEO */}
               <span className="text-transparent bg-clip-text bg-linear-to-b from-yellow-300 to-yellow-700">
-                Satta King Cloud
+                Satta King Result
               </span>
             </h2>
 
