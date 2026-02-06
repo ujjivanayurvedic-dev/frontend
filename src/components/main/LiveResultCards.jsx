@@ -107,7 +107,7 @@ const LiveResultCards = () => {
                   </span>
                   <div className="w-14 h-14 md:w-16 md:h-16 bg-white rounded-full flex items-center justify-center shadow-lg border-4 border-gray-200">
                     <span className="text-2xl md:text-3xl font-extrabold text-gray-800">
-                      {results[game.key]?.last || <span className="text-gray-300 text-lg">-</span>}
+                      {results[game.key]?.last || <span className="text-gray-300 text-lg"></span>}
                     </span>
                   </div>
                 </div>
