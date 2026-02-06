@@ -36,6 +36,24 @@ const RecentResultsWidget = () => {
   
   const dates = getDates();
   
+  // Parse time string to 24-hour format
+  const parseTimeString = (timeStr, dateStr) => {
+    if (!timeStr) return new Date().getTime();
+    
+    const [time, period] = timeStr.toLowerCase().split(' ');
+    const [hours, minutes] = time.split(':').map(Number);
+    const [day, month, year] = dateStr.split('-').map(Number);
+    
+    let hour24 = hours;
+    if (period === 'pm' && hours < 12) {
+      hour24 = hours + 12;
+    } else if (period === 'am' && hours === 12) {
+      hour24 = 0;
+    }
+    
+    return new Date(year, month - 1, day, hour24, minutes).getTime();
+  };
+  
   // Format time to 12-hour with AM/PM
   const formatTime = (timestamp) => {
     if (!timestamp) return '--:--';
@@ -54,25 +72,24 @@ const RecentResultsWidget = () => {
     const diff = now - timestamp;
     const minutes = Math.floor(diff / 60000);
     const hours = Math.floor(diff / 3600000);
+    const days = Math.floor(diff / 86400000);
     
     if (minutes < 1) return 'Just now';
     if (minutes < 60) return `${minutes} min ago`;
     if (hours < 24) return `${hours} hour${hours > 1 ? 's' : ''} ago`;
-    return 'Yesterday';
+    if (days < 2) return 'Yesterday';
+    return `${days} days ago`;
   };
   
   // Fetch data using your API
   const fetchData = async () => {
-    // 1. Properly handle AbortController to prevent "Request cancelled" spam
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
     }
     abortControllerRef.current = new AbortController();
     
-    // Check mount status
     if (!isMounted.current) return;
     
-    // Only set loading to true if we don't have results yet to prevent UI flickering
     if (results.length === 0) setLoading(true);
     setError(null);
     
@@ -88,7 +105,6 @@ const RecentResultsWidget = () => {
       
       const data = await response.json();
       
-      // 2. Ensure state only updates if still mounted
       if (isMounted.current && data.success && data.data) {
         processGameChartData(data.data);
         setLastUpdate(new Date().toLocaleTimeString('en-IN', { 
@@ -98,7 +114,6 @@ const RecentResultsWidget = () => {
         }));
       }
     } catch (error) {
-      // 3. SILENTLY handle AbortError so it doesn't break the UI or log errors
       if (error.name === 'AbortError') {
         return; 
       }
@@ -125,74 +140,73 @@ const RecentResultsWidget = () => {
       return;
     }
     
-    const todayData = apiData.find(item => item.date === dates.today);
-    const yesterdayData = apiData.find(item => item.date === dates.yesterday);
+    // Collect ALL games from all dates
+    let allGames = [];
     
-    let allResults = [];
-    let source = 'none';
-    
-    // Process today's games
-    if (todayData && todayData.games) {
-      const todayResults = Object.entries(todayData.games).map(([name, gameData]) => ({
-        name,
-        result: gameData.result || '--',
-        timestamp: gameData.timestamp || Date.now(),
-        formattedTime: formatTime(gameData.timestamp),
-        timeAgo: getTimeAgo(gameData.timestamp),
-        isToday: true,
-        priority: 1,
-        hasResult: gameData.result && gameData.result !== '--'
-      }));
-      
-      allResults.push(...todayResults);
-      source = 'today';
-    }
-    
-    // Add yesterday's games if today has less than 3 results
-    if (allResults.length < 3 && yesterdayData && yesterdayData.games) {
-      const yesterdayResults = Object.entries(yesterdayData.games).map(([name, gameData]) => ({
-        name,
-        result: gameData.result || '--',
-        timestamp: (gameData.timestamp || Date.now()) - 86400000, 
-        formattedTime: formatTime(gameData.timestamp),
-        timeAgo: 'Yesterday',
-        isToday: false,
-        priority: 0,
-        hasResult: gameData.result && gameData.result !== '--'
-      }));
-      
-      allResults.push(...yesterdayResults);
-      if (source === 'today' && yesterdayResults.length > 0) {
-        source = 'mixed';
-      } else if (yesterdayResults.length > 0) {
-        source = 'yesterday';
+    apiData.forEach(dayData => {
+      if (dayData.games && dayData.date) {
+        Object.entries(dayData.games).forEach(([gameName, gameInfo]) => {
+          if (gameInfo.result && gameInfo.time) {
+            const timestamp = parseTimeString(gameInfo.time, dayData.date);
+            
+            allGames.push({
+              name: gameName,
+              result: gameInfo.result,
+              timestamp: timestamp,
+              formattedTime: formatTime(timestamp),
+              timeAgo: getTimeAgo(timestamp),
+              date: dayData.date,
+              isToday: dayData.date === dates.today,
+              hasResult: true,
+              rawTime: gameInfo.time
+            });
+          }
+        });
       }
-    }
-    
-    // Sort logic
-    allResults.sort((a, b) => {
-      if (a.priority !== b.priority) return b.priority - a.priority;
-      return b.timestamp - a.timestamp;
     });
     
-    let topResults = allResults.slice(0, 3);
+    // Sort by timestamp DESCENDING (newest first)
+    allGames.sort((a, b) => b.timestamp - a.timestamp);
     
-    if (topResults.length < 3) {
-      const placeholdersNeeded = 3 - topResults.length;
+    // Take only the 3 most recent results
+    let recentResults = allGames.slice(0, 3);
+    
+    // Fill with placeholders if needed
+    if (recentResults.length < 3) {
+      const placeholdersNeeded = 3 - recentResults.length;
       const placeholders = getPlaceholderData().slice(0, placeholdersNeeded);
-      topResults = [...topResults, ...placeholders];
+      recentResults = [...recentResults, ...placeholders];
     }
     
-    setResults(topResults);
+    // Determine data source
+    let source = 'none';
+    const hasToday = recentResults.some(r => r.isToday && r.hasResult);
+    const hasYesterday = recentResults.some(r => r.date === dates.yesterday && r.hasResult);
+    
+    if (hasToday && hasYesterday) {
+      source = 'mixed';
+    } else if (hasToday) {
+      source = 'today';
+    } else if (hasYesterday) {
+      source = 'yesterday';
+    } else if (recentResults.some(r => r.hasResult)) {
+      source = 'older';
+    }
+    
+    setResults(recentResults);
     setDataSource(source);
   };
   
   const getPlaceholderData = () => {
-    return [
-      { name: "DESAWAR", result: "--", isToday: false, hasResult: false },
-      { name: "GALI", result: "--", isToday: false, hasResult: false },
-      { name: "NOIDA KING", result: "--", isToday: false, hasResult: false }
+    const now = Date.now();
+    const placeholders = [
+      { name: "DESAWAR", result: "", timestamp: now - 3600000, formattedTime: "--:--", timeAgo: "", isToday: false, hasResult: false },
+      { name: "GALI", result: "", timestamp: now - 7200000, formattedTime: "--:--", timeAgo: "", isToday: false, hasResult: false },
+      { name: "NOIDA KING", result: "", timestamp: now - 10800000, formattedTime: "--:--", timeAgo: "", isToday: false, hasResult: false }
     ];
+    
+    // Sort placeholders by timestamp (newest first)
+    return placeholders.sort((a, b) => b.timestamp - a.timestamp);
   };
   
   // Initial fetch and setup
@@ -225,9 +239,11 @@ const RecentResultsWidget = () => {
           ? 'No results declared today yet' 
           : `Showing ${validResults} latest result${validResults !== 1 ? 's' : ''} from today`;
       case 'yesterday':
-        return `Showing yesterday's results (today's not available yet)`;
+        return `Showing yesterday's results`;
       case 'mixed':
-        return 'Mixed results from today and yesterday';
+        return 'Showing latest results from today and yesterday';
+      case 'older':
+        return 'Showing recent results';
       default:
         return 'Waiting for live results...';
     }
@@ -240,6 +256,12 @@ const RecentResultsWidget = () => {
       case 2: return { bg: 'from-emerald-500 to-green-500', text: 'text-white', border: 'border-emerald-400/30' };
       default: return { bg: 'from-slate-600 to-slate-700', text: 'text-white', border: 'border-slate-500/20' };
     }
+  };
+  
+  // Get display order number (1st, 2nd, 3rd) based on actual data, not just position
+  const getDisplayOrder = (index, hasResult) => {
+    if (!hasResult) return null;
+    return index + 1;
   };
   
   return (
@@ -318,6 +340,7 @@ const RecentResultsWidget = () => {
           results.map((game, index) => {
             const colors = getPositionColor(index);
             const hasResult = game.hasResult;
+            const displayOrder = getDisplayOrder(index, hasResult);
             const isLatest = index === 0 && hasResult;
             
             return (
@@ -329,13 +352,13 @@ const RecentResultsWidget = () => {
                     : 'bg-linear-to-br from-slate-800/50 to-slate-900/50 border border-slate-700/30'
                 }`}
               >
-                {hasResult && (
+                {displayOrder && (
                   <div className={`absolute -top-2 -left-2 w-8 h-8 rounded-full flex items-center justify-center text-xs font-black shadow-lg ${
-                    index === 0 ? 'bg-linear-to-br from-amber-500 to-yellow-500 text-black' :
-                    index === 1 ? 'bg-linear-to-br from-blue-500 to-cyan-500 text-white' :
+                    displayOrder === 1 ? 'bg-linear-to-br from-amber-500 to-yellow-500 text-black' :
+                    displayOrder === 2 ? 'bg-linear-to-br from-blue-500 to-cyan-500 text-white' :
                     'bg-linear-to-br from-emerald-500 to-green-500 text-white'
                   }`}>
-                    #{index + 1}
+                    {displayOrder}
                   </div>
                 )}
                 
@@ -365,16 +388,26 @@ const RecentResultsWidget = () => {
                       )}
                     </div>
                     
-                    <div className="flex items-center gap-3 mt-2">
+                    <div className="flex flex-col gap-1 mt-2">
                       {game.formattedTime && game.formattedTime !== '--:--' && (
-                        <span className="text-xs text-slate-300 font-mono bg-slate-800/50 px-2 py-1 rounded-lg">
-                          ⏰ {game.formattedTime}
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <svg className="w-3 h-3 text-amber-500" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
+                          </svg>
+                          <span className="text-xs text-slate-300 font-mono">
+                            {game.formattedTime}
+                          </span>
+                          {game.timeAgo && game.timeAgo !== 'Just now' && game.timeAgo !== 'Yesterday' && (
+                            <span className="text-xs text-slate-500">
+                              • {game.timeAgo}
+                            </span>
+                          )}
+                        </div>
                       )}
                       
-                      {game.timeAgo && game.timeAgo !== 'Yesterday' && (
-                        <span className="text-xs text-slate-400">
-                          ({game.timeAgo})
+                      {game.date && game.date !== dates.today && hasResult && (
+                        <span className="text-[11px] text-slate-400">
+                          Date: {game.date}
                         </span>
                       )}
                       
@@ -392,14 +425,14 @@ const RecentResultsWidget = () => {
                         ? `w-16 h-16 text-3xl ${colors.text} bg-linear-to-br ${colors.bg}`
                         : 'w-14 h-14 text-xl text-slate-400 bg-linear-to-br from-slate-700 to-slate-800'
                     }`}>
-                      {game.result}
+                      {game.result || '--'}
                       
                       {isLatest && (
                         <div className="absolute inset-0 rounded-full border-2 border-amber-400/50 animate-ping"></div>
                       )}
                     </div>
                     
-                    {game.timeAgo === 'Just now' && (
+                    {game.timeAgo === 'Just now' && hasResult && (
                       <div className="absolute -top-1 -right-1 w-6 h-6 bg-red-500 rounded-full flex items-center justify-center animate-bounce">
                         <span className="text-[8px] font-black text-white">NEW</span>
                       </div>
