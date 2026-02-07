@@ -6,7 +6,7 @@ const RecentResultsWidget = () => {
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(true);
   const [lastUpdate, setLastUpdate] = useState('');
-  const [dataSource, setDataSource] = useState('today'); // today, yesterday, mixed
+  const [dataSource, setDataSource] = useState('today'); 
   const [error, setError] = useState(null);
   
   // Refs for cleanup
