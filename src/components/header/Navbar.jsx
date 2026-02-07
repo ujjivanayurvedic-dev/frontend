@@ -11,33 +11,31 @@ function Navbar() {
   const activeBtn = "bg-red-600 text-white";
   const normalBtn = "bg-[#F5FFBD] text-red-600";
 
+  const isHome = location.pathname === "/" && !location.hash;
+  const isResults = location.hash === "#results";
+  const isChart = location.hash === "#chart";
+
   return (
     <nav className="w-full bg-black flex justify-center py-2 sticky top-0 z-50">
       <div className="w-[95%] flex justify-between gap-2">
 
         <button
           onClick={() => navigate("/")}
-          className={`${baseBtn} ${
-            location.pathname === "/" ? activeBtn : normalBtn
-          }`}
+          className={`${baseBtn} ${isHome ? activeBtn : normalBtn}`}
         >
           HOME
         </button>
 
         <button
-          onClick={() => navigate("/satta-king")}
-          className={`${baseBtn} ${
-            location.pathname === "/satta-king" ? activeBtn : normalBtn
-          }`}
+          onClick={() => navigate("/#results")}
+          className={`${baseBtn} ${isResults ? activeBtn : normalBtn}`}
         >
           SATTA KING
         </button>
 
         <button
-          onClick={() => navigate("/chart")}
-          className={`${baseBtn} ${
-            location.pathname === "/chart" ? activeBtn : normalBtn
-          }`}
+          onClick={() => navigate("/#chart")}
+          className={`${baseBtn} ${isChart ? activeBtn : normalBtn}`}
         >
           CHART
         </button>
