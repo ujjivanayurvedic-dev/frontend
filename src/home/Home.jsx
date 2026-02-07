@@ -9,9 +9,6 @@ import LiveResultCards from "../components/main/LiveResultCards";
 import Disclaimer from "../components/Disclaimer/Disclaimer";
 import RecentResultsWidget from "../components/main/RecentResultsWidget";
 
-
-
-
 export default function Home() {
   const location = useLocation();
 
@@ -19,16 +16,18 @@ export default function Home() {
   const chartRef = useRef(null);
 
   useEffect(() => {
-    if (location.pathname === "/satta-king") {
+    if (location.hash === "#results") {
       resultsRef.current?.scrollIntoView({ behavior: "smooth" });
     }
-    if (location.pathname === "/chart") {
+
+    if (location.hash === "#chart") {
       chartRef.current?.scrollIntoView({ behavior: "smooth" });
     }
-    if (location.pathname === "/") {
-      window.scrollTo({ top: 0, behavior: "smooth" });
+
+    if (!location.hash) {
+      window.scrollTo({ top: 0 });
     }
-  }, [location.pathname]);
+  }, [location.hash]);
 
   return (
     <>
@@ -36,13 +35,16 @@ export default function Home() {
       <HeaderStrip />
       <HighlightBanner />
       <Disclaimer />
-      <RecentResultsWidget/>
-      <div ref={resultsRef}>
-        <LiveResultCards/>
+      <RecentResultsWidget />
+
+      <div id="results" ref={resultsRef}>
+        <LiveResultCards />
       </div>
-      <div ref={chartRef}>
-        <GameResultsTable/>
+
+      <div id="chart" ref={chartRef}>
+        <GameResultsTable />
       </div>
+
       <Disclaimer />
       <WhatsAppButton />
     </>
