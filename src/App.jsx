@@ -10,7 +10,7 @@ import TitleManager from "./components/TitleManager/TitleManager";
 // Pages import 
 import SattaResult from "./pages/SattaResult";
 import Gali from "./pages/Gali";
-import Deshawar from "./pages/Deshawar";
+import Deshwar from "./pages/Deshwar";
 import Faridabad from "./pages/Faridabad";
 import Ghaziabad from "./pages/Ghaziabad";
 import NoidaKing from "./pages/NoidaKing";
@@ -43,8 +43,8 @@ export default function App() {
           {/* pages */}
           <Route path="/satta-result" element={<SattaResult />} />
           <Route path="/satta-matka" element={<Home />} />
-          <Route path="/disawar-result" element={<Deshawar />} />
-          <Route path="/desawar-result" element={<Deshawar />} />
+          <Route path="/disawar-result" element={<Deshwar />} />
+          <Route path="/desawar-result" element={<Deshwar />} />
           <Route path="/gali-result" element={<Gali />} />
           <Route path="/faridabad-result" element={<Faridabad/>} />
           <Route path="/ghaziabad-result" element={<Ghaziabad />} />
