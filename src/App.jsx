@@ -68,6 +68,14 @@ export default function App() {
             path="/satta-king-result-february-2026"
             element={<Navigate to="/february-2026-satta-king" replace />}
           />
+          <Route
+            path="/satta-king-2026-february-ka-result"
+            element={<Navigate to="/february-2026-satta-king" replace />}
+          />
+          <Route
+            path="/february-2026-satta-king-result"
+            element={<Navigate to="/february-2026-satta-king" replace />}
+          />
 
           {/* PROTECTED */}
           <Route element={<ProtectedRoute />}>
