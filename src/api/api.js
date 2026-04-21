@@ -18,7 +18,7 @@ const api = {
     // app.use("/api/v1", scraperRoutes) -> /scrape
     saveScrape: `${DataAPI}/v1/scrape`,
     getScrape: `${DataAPI}/v1/results`,
-    gameChartFull: `${DataAPI}/game-chart-full`,
+    gameChartFull: (since) => `${DataAPI}/game-chart-full${since ? `?since=${since}` : ''}`,
     gameChartLive: `${DataAPI}/game-chart-live`,
     gameChartRecent: `${DataAPI}/game-chart-recent`,
   }
