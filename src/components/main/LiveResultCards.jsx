@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import axios from 'axios';
 import api from '../../api/api';
+import Persistence from '../../api/persistence'; // 🆕 Production Persistence
 
 const GAMES_CONFIG = [
   { key: 'DESAWAR', label: 'DESAWAR', time: '05:30 AM' },
@@ -32,49 +33,64 @@ const formatDate = (date) => {
 };
 
 const LiveResultCards = () => {
-  // 1. Initialize with structured empty results (avoids undefined checks)
-  const [results, setResults] = useState(createInitialResults());
-  const [isLoading, setIsLoading] = useState(true);
+  // 🟢 PRODUCTION HYDRATION: Sync initial results from cache instantly
+  const [results, setResults] = useState(() => {
+    const { data: cachedData } = Persistence.loadResults();
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    
+    const todayStr = formatDate(today);
+    const yesterdayStr = formatDate(yesterday);
+    
+    const initial = createInitialResults();
+    const todayEntry = cachedData.find(i => i.date === todayStr)?.games;
+    const yesterdayEntry = cachedData.find(i => i.date === yesterdayStr)?.games;
+    
+    GAMES_CONFIG.forEach(game => {
+      initial[game.key] = {
+        today: todayEntry?.[game.key]?.result || null,
+        last: yesterdayEntry?.[game.key]?.result || null
+      };
+    });
+    return initial;
+  });
+
+  const [isLoading, setIsLoading] = useState(false); // Start false because we have cache
   
-  // 2. Optimized fetch with caching
+  // 🔄 PRODUCTION SYNC: Visibility-aware polling
   useEffect(() => {
+    let isMounted = true;
+    let intervalId = null;
+
     const fetchAndProcessData = async () => {
+      // 🕵️ SMART POLLING: Don't fetch if tab is hidden
+      if (document.visibilityState !== 'visible') return;
+
       try {
-        setIsLoading(true);
-        
-        // Use Promise.race for timeout protection
-        const fetchPromise = axios.get(api.NewScrapeData.gameChartLive, {
-          timeout: 5000, // 5 second timeout
-          headers: {
-            'Cache-Control': 'no-cache',
-            'Pragma': 'no-cache'
-          }
+        const response = await axios.get(api.NewScrapeData.gameChartLive, {
+          timeout: 4000,
+          headers: { 'Cache-Control': 'no-cache' }
         });
         
-        const timeoutPromise = new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Request timeout')), 5000)
-        );
-        
-        const response = await Promise.race([fetchPromise, timeoutPromise]);
-        
-        if (response?.data?.success) {
-          // Process data immediately without waiting for dates
+        if (isMounted && response?.data?.success) {
           processDataWithServerResponse(response.data.data);
         }
       } catch (error) {
         console.error("Live fetch error:", error);
-        // Consider implementing retry logic here
-      } finally {
-        setIsLoading(false);
       }
     };
     
+    // Initial sync
     fetchAndProcessData();
     
-    // Optional: Set up polling if needed
-    const intervalId = setInterval(fetchAndProcessData, 30000); // 30 seconds
+    // Set up polling (30s interval)
+    intervalId = setInterval(fetchAndProcessData, 30000);
     
-    return () => clearInterval(intervalId);
+    return () => {
+      isMounted = false;
+      clearInterval(intervalId);
+    };
   }, []);
 
   // 3. Highly optimized data processing
